@@ -113,14 +113,13 @@ RUN echo "=== Building CUDA-enabled Ceres Solver with cuDSS ===" \
         -DCMAKE_CUDA_COMPILER=/usr/local/cuda/bin/nvcc \
         -DBUILD_TESTING=OFF \
         -DBUILD_EXAMPLES=OFF \
+        -DBUILD_SHARED_LIBS=OFF \
         -Dabsl_DIR=/usr/local/lib/cmake/absl \
     && echo "=== Ceres CMake Configuration Complete ===" \
     && ninja \
     && ninja install \
     && echo "" \
-    && echo "=== Verification: Check Ceres cuDSS linking ===" \
-    && ldd /usr/local/lib/libceres.so | grep cudss && echo "✓ Ceres is linked to cuDSS" || echo "⚠️  WARNING: Ceres not linked to cuDSS (will fall back to CPU)" \
-    && echo "=== CUDA-enabled Ceres Solver with cuDSS installed ===" \
+    && echo "✓ Ceres startic library installed ===" \
     && cd /tmp \
     && rm -rf ceres-solver
 
