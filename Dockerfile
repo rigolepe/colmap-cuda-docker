@@ -1,5 +1,4 @@
-FROM ubuntu:24.04
-
+FROM nvidia/cuda:12.8.1-cudnn-devel-ubuntu24.04
 # Set non-interactive mode
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -89,23 +88,11 @@ RUN echo "=== Building abseil-cpp ===" \
 # ============================================================================
 WORKDIR /tmp
 RUN echo "=== Installing cuDSS for GPU Bundle Adjustment ===" \
-    && pip install --no-cache-dir nvidia-cudss-cu12==0.7.1.4 \
-    && SITE_PACKAGES=$(python3 -c "import site; print(site.getsitepackages()[0])") \
-    && echo "Installed cuDSS from pip at: $SITE_PACKAGES/nvidia/cu12" \
-    && echo "Copying cuDSS libraries to CUDA directories..." \
-    && cp -v $SITE_PACKAGES/nvidia/cu12/lib/libcudss*.so* /usr/local/cuda/lib64/ \
-    && cp -v $SITE_PACKAGES/nvidia/cu12/include/cudss*.h /usr/local/cuda/include/ \
-    && echo "" \
-    && echo "CRITICAL CHECK: Verify cuDSS library installation" \
-    && ls -lah /usr/local/cuda/lib64/libcudss* \
-    && ls -lah /usr/local/cuda/include/cudss* \
-    && test -f /usr/local/cuda/lib64/libcudss.so.0 || (echo "❌ ERROR: libcudss.so.0 not found!" && exit 1) \
-    && test -f /usr/local/cuda/include/cudss.h || (echo "❌ ERROR: cudss.h not found!" && exit 1) \
-    && echo "Creating symlink libcudss.so -> libcudss.so.0" \
-    && ln -sf /usr/local/cuda/lib64/libcudss.so.0 /usr/local/cuda/lib64/libcudss.so \
-    && ldconfig \
-    && ldconfig -p | grep cudss \
-    && echo "✓ cuDSS 0.7.1.4 installed and verified"
+    && wget https://developer.download.nvidia.com/compute/cudss/redist/libcudss/linux-x86_64/libcudss-linux-x86_64-0.7.1.4_cuda12-archive.tar.xz \
+    && tar -xf libcudss-linux-x86_64-0.7.1.4_cuda12-archive.tar.xz \
+    && cp -v /tmp/libcudss-linux-x86_64-0.7.1.4_cuda12-archive/lib/libcudss*.so* /usr/local/cuda/lib64/ \
+    && echo "export cudss_DIR=/tmp/libcudss-linux-x86_64-0.7.1.4_cuda12-archive/lib/cmake/cudss" >> /tmp/envfile \
+    && echo "✓ cuDSS installed"
 
 # ============================================================================
 # 6: CUDA-enabled Ceres Solver 2.3.0 with cuDSS
@@ -117,16 +104,13 @@ RUN echo "=== Building CUDA-enabled Ceres Solver with cuDSS ===" \
     && cd ceres-solver \
     && mkdir build \
     && cd build \
+    && . /tmp/envfile \
     && cmake .. -GNinja \
         -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_INSTALL_PREFIX=/usr/local \
         -DUSE_CUDA=ON \
-        -DUSE_CUDSS=ON \
-        -DCUDSS_INCLUDE_DIR=/usr/local/cuda/include \
-        -DCUDSS_LIBRARY=/usr/local/cuda/lib64/libcudss.so \
         -DCMAKE_CUDA_ARCHITECTURES="80;86;89;90" \
         -DCMAKE_CUDA_COMPILER=/usr/local/cuda/bin/nvcc \
-        -DEIGEN_INCLUDE_DIR_HINTS=/usr/include/eigen3 \
         -DBUILD_TESTING=OFF \
         -DBUILD_EXAMPLES=OFF \
         -Dabsl_DIR=/usr/local/lib/cmake/absl \
@@ -149,6 +133,7 @@ RUN echo "=== Building COLMAP 3.12.6 ===" \
     && git clone --depth 1 --branch 3.12.6 https://github.com/colmap/colmap.git \
     && cd colmap \
     && mkdir build && cd build \
+    && . /tmp/envfile \
     && cmake .. -GNinja \
         -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_INSTALL_PREFIX=/usr/local \
@@ -169,7 +154,6 @@ RUN echo "=== Building COLMAP 3.12.6 ===" \
 RUN echo "=== Verifying Base Image Build ===" \
     && echo "CMake version:" && cmake --version \
     && echo "COLMAP installed:" && colmap --help > /dev/null && echo "✓" \
-    && echo "GLOMAP installed:" && glomap --help > /dev/null && echo "✓" \
     && echo "CUDA version:" && nvcc --version \
     && echo "✓ Colmap image build complete"
 
